@@ -1,0 +1,20 @@
+[
+  {
+    "id": "123",
+    "problem": "Given two integers A and B, print their sum.",
+    "test_cases": "3\n3 5\n10 20\n-4 7",
+    "expected_output": "8\n30\n3"
+  },
+  {
+    "id": "124",
+    "problem": "Given three integers A, B, and C, print the largest among them.",
+    "test_cases": "4 9 2\n15 7 20\n5 5 5",
+    "expected_output": "9\n20\n5"
+  },
+  {
+    "id": "125",
+    "problem": "Given N integers, count how many of them are even.",
+    "test_cases": "5\n1 2 3 4 5\n6\n2 4 6 8 10 12\n4\n1 3 5 7",
+    "expected_output": "2\n6\n0"
+  }
+]
