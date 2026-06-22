@@ -6,8 +6,9 @@ class QueueListener {
 private:
     sw::redis::Redis redis;
     std::string queueName;
-public:
-    QueueListener(const std::string& redisUrl, const std::string& qName);
+    std::string container_name;
+    public:
+    QueueListener(const std::string& redisUrl, const std::string& qName, const std::string& cName);
 
     void listen();
 };
