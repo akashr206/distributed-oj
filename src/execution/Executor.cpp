@@ -14,12 +14,14 @@ void Executor::execute(const std::string& id, const std::string &code, const std
 
     std::ofstream wcode((folder + "/code.cpp").c_str());
     std::ofstream winput((folder + "/input.txt").c_str());
+    
     if (!wcode.is_open()) {
         throw std::runtime_error("Critical Error: Failed to open code.cpp for writing!");
     }
     if (!winput.is_open()) {
         throw std::runtime_error("Critical Error: Failed to open input.cpp for writing!");
     }
+
     wcode << code  << std::endl;
     winput << input << std::endl;
 
@@ -29,8 +31,8 @@ void Executor::execute(const std::string& id, const std::string &code, const std
     std::string cmd =
     "docker run --rm "
     "--network none "
-    "--cpus=4 "
-    "--memory=2048m "
+    "--cpus=1 "
+    "--memory=512m "
     "--pids-limit=20 "
     "--user=1000:1000 "
     "-w /workspace "
@@ -38,6 +40,7 @@ void Executor::execute(const std::string& id, const std::string &code, const std
     "gcc:14 "
     "sh -c \""
     "g++ code.cpp -std=c++17 -o program && "
+    "ulimit -f 1024 && "
     "timeout 2s ./program < input.txt > output.txt"
     "\"";
 
