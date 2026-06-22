@@ -22,9 +22,9 @@ void QueueListener::listen() {
             std::cout << "[Payload] " << subId << std::endl;
             
             auto job = JobRepo::getInstance().getById(subId);
+            Executor executor;
+            executor.execute(subId, job);
             std::cout << job << std::endl;
-            Executor executor(container_name);
-            executor.execute(subId, job.code, job.input);
             
 
             // call executor and extract output

@@ -23,6 +23,8 @@ struct Job {
 
     std::string error;
     std::string internalError;
+
+    static Job fromBson(bsoncxx::document::view view);
 };
 
 inline std::ostream& operator<<(std::ostream& os, const Job& job) {
