@@ -88,13 +88,6 @@ void JobRepo::updateJob(std::string id, Job& job){
     auto filter = make_document(kvp("_id", bsoncxx::oid{id}));
     auto update = make_document(
         kvp("$set", make_document(
-            kvp("code", job.code),
-            kvp("input", job.input),
-            kvp("expected", job.expected),
-            kvp("language", job.language),
-            kvp("timeLimit", job.timeLimit),
-            kvp("memoryLimit", job.memoryLimit),
-
             kvp("status", job.status),
             kvp("output", job.output),
             kvp("verdict", job.verdict),

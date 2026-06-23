@@ -39,7 +39,8 @@ int main() {
 
     unsigned int numWorkers = std::thread::hardware_concurrency();
 
-    if(numWorkers == 0) numWorkers = 4;
+    if(numWorkers > 8) numWorkers = 8;
+    
     std::cout << "Initializing " << numWorkers << " worker threads.\n";
     std::vector<std::thread> threads;
 

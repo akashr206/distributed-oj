@@ -3,10 +3,13 @@
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <vector>
 #include <algorithm>
 #include <cstdlib>
 #include <sstream>
 #include <sys/wait.h>
+#include <unistd.h>
+#include <errno.h>
 #include <chrono>
 
 
@@ -23,7 +26,7 @@ void Executor::execute(const std::string& id, Job& job){
     std::string input = job.input;
     std::string language = job.language.empty() ? "cpp" : job.language;
     int timeLimit = job.timeLimit == 0 ? 2000 : job.timeLimit;
-    int memoryLimit = job.timeLimit == 0 ? 256 : job.memoryLimit;
+    int memoryLimit = job.memoryLimit == 0 ? 256 : job.memoryLimit;
     int timeInS = timeLimit / 1000;
 
     if(timeInS > 5) {
@@ -56,41 +59,62 @@ void Executor::execute(const std::string& id, Job& job){
     wcode.close();
     winput.close();
 
-    
-    std::string cmd =
-    "docker run --rm "
-    "--network none "
-    "--cpus=0.5 "
-    "--memory=" + std::to_string(memoryLimit) + "m "
-    "--pids-limit=20 "
-    "--user=1000:1000 "
-    "-w /workspace "
-    "-v \"" + folder + "\":/workspace "
-    "oj-cpp "
-    "sh -c \""
-    "if ! g++ code.cpp -std=c++17 -o program 2> err.txt; then exit 201; fi; "
-    "ulimit -f 1024; "
-    "/usr/bin/time -f \\\"%M %e\\\" -o stats.txt "
-    "timeout "+ std::to_string(timeInS) +"s ./program < input.txt > output.txt 2> err.txt"
-    "\"";
+    std::string volumeMount = folder + ":/workspace";
+    std::string memoryStr = std::to_string(memoryLimit) + "m";
+    std::string timeLimitStr = std::to_string(timeInS);
 
-    std::cout << cmd << std::endl;
+    std::string shellCmd =
+        "if ! g++ code.cpp -std=c++17 -o program 2> err.txt; then exit 201; fi; "
+        "ulimit -f 1024; "
+        "/usr/bin/time -f \"%M %e\" -o stats.txt "
+        "timeout " + timeLimitStr + "s ./program < input.txt > output.txt 2> err.txt";
 
-    auto st = std::chrono::steady_clock::now();
+    std::vector<std::string> argStrs = {
+        "docker", "run", "--rm",
+        "--network", "none",
+        "--cpus", "1",
+        "--memory", memoryStr,
+        "--pids-limit", "20",
+        "--user", "1000:1000",
+        "-w", "/workspace",
+        "-v", volumeMount,
+        "oj-cpp",
+        "sh", "-c", shellCmd
+    };
 
-    int systemStatus = system(cmd.c_str());
+    std::vector<const char*> args;
+    for (const auto& s : argStrs) {
+        args.push_back(s.c_str());
+    }
+    args.push_back(nullptr);
 
-    auto end = std::chrono::steady_clock::now();
+    std::cout << "Executing code in sandbox" << std::endl;
+
+    pid_t pid = fork();
+    if (pid == -1) {
+        throw std::runtime_error("fork() failed");
+    }
+
+    int systemStatus = 0;
+    if (pid == 0) {
+        execv("/usr/bin/docker", (char* const*)args.data());
+        std::cerr << "execv() failed: " << strerror(errno) << std::endl;
+        exit(127);
+    } else {
+        int status;
+        waitpid(pid, &status, 0);
+        systemStatus = status;
+    }
 
     int memoryUsed = 0;
-    double timeTaken = std::chrono::duration<double>(end - st).count();
+    double timeTaken = 0;
 
     std::ifstream stats(folder + "/stats.txt");
     if(stats){
-        stats >> memoryUsed;
+        stats >> memoryUsed >> timeTaken;
     }
     job.memoryUsed = memoryUsed / 1024;
-    job.timeTaken = static_cast<int> (timeTaken * 10);
+    job.timeTaken = static_cast<int> (timeTaken * 1000);
 
     int statusCode = WEXITSTATUS(systemStatus);
 
@@ -131,6 +155,6 @@ void Executor::execute(const std::string& id, Job& job){
     job.verdict = verdict;
     job.error = error;
     job.output = output.size() > 4096 ? output.substr(0, 4093) : output;
-
-    std::cout << "Execution for " << id << "Completed !" << std::endl;   
+    std::filesystem::remove_all(folder);
+    std::cout << "Execution for " << id << " Completed!" << std::endl;   
 }

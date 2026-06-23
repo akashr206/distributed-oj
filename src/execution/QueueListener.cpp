@@ -22,6 +22,9 @@ void QueueListener::listen() {
                 auto jobRepo = JobRepo();
                 Job job;
                 try{
+                    if (subId.length() != 24 || !std::all_of(subId.begin(), subId.end(), ::isxdigit)) {
+                        throw std::invalid_argument("Invalid Job ID format");
+                    }
                     job = jobRepo.getById(subId);
                     std::cout << "["<< container_name << "] Picked up new task" << std:: endl;
                     std::cout << "[Payload] " << subId << std::endl;
