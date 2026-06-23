@@ -65,15 +65,26 @@ void Executor::execute(const std::string& id, Job& job){
     "--user=1000:1000 "
     "-w /workspace "
     "-v \"" + folder + "\":/workspace "
-    "gcc:14 "
+    "oj-cpp "
     "sh -c \""
     "if ! g++ code.cpp -std=c++17 -o program 2> err.txt; then exit 201; fi; "
     "ulimit -f 1024; "
+    "/usr/bin/time -f \\\"%e %M\\\" -o stats.txt "
     "timeout "+ std::to_string(timeInS) +"s ./program < input.txt > output.txt 2> err.txt"
     "\"";
 
     std::cout << cmd << std::endl;
     int systemStatus = system(cmd.c_str());
+
+    int memoryUsed = 0;
+    double timeTaken = 0.0;
+    std::ifstream stats(folder + "/stats.txt");
+    if(stats){
+        stats >> timeTaken >> memoryUsed;
+    }
+    job.memoryUsed = memoryUsed / 1024;
+    job.timeTaken = static_cast<int> (timeTaken * 1000);
+
     int statusCode = WEXITSTATUS(systemStatus);
 
     std::string verdict = "";
@@ -110,7 +121,7 @@ void Executor::execute(const std::string& id, Job& job){
     }
     job.verdict = verdict;
     job.error = error;
-    job.output = output;
+    job.output = output.size() > 4096 ? output.substr(0, 4093) : output;
 
     std::cout << "Execution for " << id << "Completed !" << std::endl;   
 }

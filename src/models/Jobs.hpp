@@ -2,9 +2,7 @@
 #include <iostream>
 #include <string>
 #include <bsoncxx/document/view.hpp>
-
-#include <iostream>
-#include <string>
+#include "db/MongoDB.hpp"
 
 struct Job {
     std::string code;
@@ -53,16 +51,13 @@ inline std::ostream& operator<<(std::ostream& os, const Job& job) {
 class JobRepo {
 
 private:
-    JobRepo() = default;
-    JobRepo(const JobRepo&) = delete;
-    JobRepo& operator=(const JobRepo&) = delete;
+    mongocxx::database db;
+    mongocxx::collection collection;
 
 public:
-    static JobRepo& getInstance() {
-        static JobRepo instance;
-        return instance;
-    }
+    JobRepo();
+
     Job getById(std::string id);
-    // void updateStatus(std::string id, std::string status);
+    void updateStatus(std::string id, std::string status);
     // void updateVerdict(std::string id, std::string output, std::string status);
 };

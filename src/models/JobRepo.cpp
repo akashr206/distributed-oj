@@ -1,5 +1,4 @@
 #include "models/Jobs.hpp"
-#include "db/MongoDB.hpp"
 #include <bsoncxx/builder/basic/document.hpp>
 #include <bsoncxx/json.hpp>
 #include <algorithm>
@@ -56,10 +55,13 @@ Job Job::fromBson(bsoncxx::document::view view) {
     return job;
 }
 
-Job JobRepo::getById(std::string id){
-    mongocxx::database db = MongoDB::getInstance().getDB();
-    auto collection = db["jobs"];
 
+JobRepo::JobRepo(){
+    db = MongoDB::getInstance().getDB();
+    collection = db["jobs"];
+}
+
+Job JobRepo::getById(std::string id){
     auto res = collection.find_one(make_document(kvp("_id", bsoncxx::oid{id})));
     
     if(!res){
@@ -67,4 +69,16 @@ Job JobRepo::getById(std::string id){
         return Job{};
     }
     return Job::fromBson(res->view());
+}
+
+void JobRepo::updateStatus(std::string id, std::string status){
+    auto filter = make_document(kvp("_id", bsoncxx::oid{id}));
+    auto data = make_document(kvp("$set", make_document(kvp("status", status))));
+    
+    auto res = collection.update_one(filter.view(), data.view());
+    if(res){
+        std::cout << "Matched: " << res->matched_count() << std::endl;
+    } else {
+        std::cout << "Job not found." << std::endl;
+    }
 }
