@@ -82,3 +82,34 @@ void JobRepo::updateStatus(std::string id, std::string status){
         std::cout << "Job not found." << std::endl;
     }
 }
+
+
+void JobRepo::updateJob(std::string id, Job& job){
+    auto filter = make_document(kvp("_id", bsoncxx::oid{id}));
+    auto update = make_document(
+        kvp("$set", make_document(
+            kvp("code", job.code),
+            kvp("input", job.input),
+            kvp("expected", job.expected),
+            kvp("language", job.language),
+            kvp("timeLimit", job.timeLimit),
+            kvp("memoryLimit", job.memoryLimit),
+
+            kvp("status", job.status),
+            kvp("output", job.output),
+            kvp("verdict", job.verdict),
+
+            kvp("timeTaken", job.timeTaken),
+            kvp("memoryUsed", job.memoryUsed),
+
+            kvp("error", job.error),
+            kvp("internalError", job.internalError)
+        ))
+    );
+
+    auto result = collection.update_one(filter.view(), update.view());
+
+    if (!result) {
+        std::cerr << "Failed to update job " << id << std::endl;
+    }
+}

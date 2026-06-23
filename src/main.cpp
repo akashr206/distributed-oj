@@ -1,21 +1,55 @@
 #include <iostream>
 #include <string> 
-#include <algorithm>
+#include <vector>
+#include <thread>
 #include "execution/QueueListener.hpp"
 
 
+void spinThread(int threadNum){
+    std::string containerName = "worker_tread_" + std::to_string(threadNum);
+    std::cout << "Initializing thread number: " << threadNum << std::endl;
+    
+    std::string redisUrl = "tcp://127.0.0.1:6379";
+    std::string qName = "submissions_queue";
+    try
+    {
+        QueueListener queueListener(redisUrl, qName, containerName);
+        queueListener.listen();
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << containerName << " crashed: " << e.what() << '\n';
+    }
+    
+}
+
 int main() {
 
-    try {
-        std::string redis_url = "tcp://127.0.0.1:6379";
-        std::string qName = "submissions_queue";
-        std::string container_name = "gcc_worker_" + std::to_string(rand() % 100000);
-        QueueListener queueListener(redis_url, qName, container_name);
-        queueListener.listen();
+    // try {
+    //     std::string redis_url = "tcp://127.0.0.1:6379";
+    //     std::string qName = "submissions_queue";
+    //     std::string container_name = "gcc_worker_" + std::to_string(rand() % 100000);
+    //     QueueListener queueListener(redis_url, qName, container_name);
+    //     queueListener.listen();
 
-    } catch (const std::exception& e){
-        std::cerr << "[ERROR] Something Went Wrong: " << e.what() << std::endl;
-        return 1;
+    // } catch (const std::exception& e){
+    //     std::cerr << "[ERROR] Something Went Wrong: " << e.what() << std::endl;
+    //     return 1;
+    // }
+
+    unsigned int numWorkers = std::thread::hardware_concurrency();
+
+    if(numWorkers == 0) numWorkers = 4;
+    std::cout << "Initializing " << numWorkers << " worker threads.\n";
+    std::vector<std::thread> threads;
+
+    for(unsigned int i = 0; i < numWorkers; ++i){
+        threads.emplace_back(spinThread, i);
     }
+
+    for(auto& t : threads){
+        if(t.joinable()) t.join();
+    }
+
     return 0;
 }

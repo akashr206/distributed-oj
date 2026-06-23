@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <sstream>
 #include <sys/wait.h>
+#include <chrono>
 
 
 std::string readFile(const std::string& path) {
@@ -59,7 +60,7 @@ void Executor::execute(const std::string& id, Job& job){
     std::string cmd =
     "docker run --rm "
     "--network none "
-    "--cpus=1 "
+    "--cpus=0.5 "
     "--memory=" + std::to_string(memoryLimit) + "m "
     "--pids-limit=20 "
     "--user=1000:1000 "
@@ -69,21 +70,27 @@ void Executor::execute(const std::string& id, Job& job){
     "sh -c \""
     "if ! g++ code.cpp -std=c++17 -o program 2> err.txt; then exit 201; fi; "
     "ulimit -f 1024; "
-    "/usr/bin/time -f \\\"%e %M\\\" -o stats.txt "
+    "/usr/bin/time -f \\\"%M %e\\\" -o stats.txt "
     "timeout "+ std::to_string(timeInS) +"s ./program < input.txt > output.txt 2> err.txt"
     "\"";
 
     std::cout << cmd << std::endl;
+
+    auto st = std::chrono::steady_clock::now();
+
     int systemStatus = system(cmd.c_str());
 
+    auto end = std::chrono::steady_clock::now();
+
     int memoryUsed = 0;
-    double timeTaken = 0.0;
+    double timeTaken = std::chrono::duration<double>(end - st).count();
+
     std::ifstream stats(folder + "/stats.txt");
     if(stats){
-        stats >> timeTaken >> memoryUsed;
+        stats >> memoryUsed;
     }
     job.memoryUsed = memoryUsed / 1024;
-    job.timeTaken = static_cast<int> (timeTaken * 1000);
+    job.timeTaken = static_cast<int> (timeTaken * 10);
 
     int statusCode = WEXITSTATUS(systemStatus);
 
@@ -108,6 +115,8 @@ void Executor::execute(const std::string& id, Job& job){
         case 126:
         case 127:
             verdict = "IE";
+            job.status = "error";
+            job.internalError = "Sandbox execution failed";
             break;
         case 0:
             output = readFile(folder + "/output.txt");

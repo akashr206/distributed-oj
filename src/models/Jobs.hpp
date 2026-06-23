@@ -59,5 +59,5 @@ public:
 
     Job getById(std::string id);
     void updateStatus(std::string id, std::string status);
-    // void updateVerdict(std::string id, std::string output, std::string status);
+    void updateJob(std::string id, Job& job);
 };
