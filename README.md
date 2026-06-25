@@ -1,6 +1,6 @@
 # Distributed OJ
 
-A simple distributed online judge system that accepts code submissions, stores them in MongoDB, queues them in Redis, and processes them with a worker binary.
+A distributed online judge system that accepts code submissions, stores them in MongoDB, queues them in Redis, and processes them with a worker binary.
 
 ## Overview
 
