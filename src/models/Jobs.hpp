@@ -12,7 +12,7 @@ struct Job {
     int timeLimit;       // in ms
     int memoryLimit;     // in MB
 
-    std::string status;  // pending, running, error, completed
+    std::string status;  // pending, running, error, completed, failed
     std::string output;  // max 4kb
     std::string verdict; // TLE, AC, WA, MLE, ER, IE, OLE
     
@@ -60,4 +60,5 @@ public:
     Job getById(std::string id);
     void updateStatus(std::string id, std::string status);
     void updateJob(std::string id, Job& job);
+    void cleanDeadJob();
 };

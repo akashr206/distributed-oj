@@ -3,6 +3,7 @@
 #include <vector>
 #include <thread>
 #include "execution/QueueListener.hpp"
+#include "models/Jobs.hpp"
 
 
 void spinThread(int threadNum){
@@ -20,7 +21,19 @@ void spinThread(int threadNum){
     {
         std::cerr << containerName << " crashed: " << e.what() << '\n';
     }
-    
+}
+
+void spinZombieJobKiller(){
+    try{
+        JobRepo jobRepo;
+        while(true){
+            jobRepo.cleanDeadJob();
+            std::this_thread::sleep_for(std::chrono::seconds(10));
+        }
+    } catch(const std::exception& e)
+    {
+        std::cerr << "Zombie killer crashed: " << e.what() << '\n';
+    }
 }
 
 int main() {
@@ -44,9 +57,11 @@ int main() {
     std::cout << "Initializing " << numWorkers << " worker threads.\n";
     std::vector<std::thread> threads;
 
-    for(unsigned int i = 0; i < numWorkers; ++i){
+    for(unsigned int i = 0; i < numWorkers - 1; ++i){
         threads.emplace_back(spinThread, i);
     }
+
+    threads.emplace_back(spinZombieJobKiller);
 
     for(auto& t : threads){
         if(t.joinable()) t.join();

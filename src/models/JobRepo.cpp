@@ -2,6 +2,8 @@
 #include <bsoncxx/builder/basic/document.hpp>
 #include <bsoncxx/json.hpp>
 #include <algorithm>
+#include <chrono>
+#include <vector>
 
 using bsoncxx::builder::basic::kvp;
 using bsoncxx::builder::basic::make_document;
@@ -73,7 +75,12 @@ Job JobRepo::getById(std::string id){
 
 void JobRepo::updateStatus(std::string id, std::string status){
     auto filter = make_document(kvp("_id", bsoncxx::oid{id}));
-    auto data = make_document(kvp("$set", make_document(kvp("status", status))));
+    auto now = std::chrono::system_clock::now();
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now.time_since_epoch()
+    ).count();
+
+    auto data = make_document(kvp("$set", make_document(kvp("status", status), kvp("updatedAt", ms))));
     
     auto res = collection.update_one(filter.view(), data.view());
     if(res){
@@ -104,5 +111,60 @@ void JobRepo::updateJob(std::string id, Job& job){
 
     if (!result) {
         std::cerr << "Failed to update job " << id << std::endl;
+    }
+}
+
+void JobRepo::cleanDeadJob(){
+    auto now = std::chrono::system_clock::now();
+    auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now.time_since_epoch()
+    ).count();
+    auto diffe = now_ms - (30 * 1000);
+
+    auto filter = make_document(
+        kvp("status", "running"),
+        kvp("updatedAt", make_document(kvp("$lte", diffe)))
+    );
+
+    auto update = make_document(kvp("$set", make_document(
+        kvp("status", "failed"),
+        kvp("internalError", "Worker crashed; please resubmit")
+    )));
+
+    mongocxx::options::find options{};
+    options.projection(make_document(kvp("_id", 1)));
+    options.batch_size(5000);
+
+    auto cursor = collection.find(filter.view(), options);
+
+    mongocxx::options::bulk_write bulk_opts;
+    bulk_opts.ordered(false);
+
+    std::vector<mongocxx::model::write> batch_ops;
+    constexpr int batch_size = 5000;
+
+    for (auto&& doc : cursor) {
+        auto id = doc["_id"].get_value();
+        auto match = make_document(kvp("_id", id));
+
+        mongocxx::model::update_one update_op(match.view(), update.view());
+        batch_ops.push_back(update_op);
+
+        if (batch_ops.size() >= batch_size) {
+            auto bulk = collection.create_bulk_write(bulk_opts);
+            for (const auto& op : batch_ops) {
+                bulk.append(op);
+            }
+            bulk.execute();
+            batch_ops.clear();
+        }
+    }
+
+    if (!batch_ops.empty()) {
+        auto bulk = collection.create_bulk_write(bulk_opts);
+        for (const auto& op : batch_ops) {
+            bulk.append(op);
+        }
+        bulk.execute();
     }
 }
