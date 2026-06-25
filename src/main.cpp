@@ -20,6 +20,10 @@ void spinThread(int threadNum){
     catch(const std::exception& e)
     {
         std::cerr << containerName << " crashed: " << e.what() << '\n';
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+    }
+    catch (...) {
+        std::cerr << containerName << " crashed with an unknown exception." << std::endl;
     }
 }
 
@@ -33,6 +37,9 @@ void spinZombieJobKiller(){
     } catch(const std::exception& e)
     {
         std::cerr << "Zombie killer crashed: " << e.what() << '\n';
+    }
+    catch (...) {
+        std::cerr << containerName << " crashed with an unknown exception." << std::endl;
     }
 }
 

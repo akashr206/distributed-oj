@@ -114,57 +114,34 @@ void JobRepo::updateJob(std::string id, Job& job){
     }
 }
 
-void JobRepo::cleanDeadJob(){
+void JobRepo::cleanDeadJob() {
     auto now = std::chrono::system_clock::now();
     auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         now.time_since_epoch()
     ).count();
-    auto diffe = now_ms - (30 * 1000);
+
+    constexpr int64_t timeout_ms = 30 * 1000;
+    auto cutoff = now_ms - timeout_ms;
 
     auto filter = make_document(
         kvp("status", "running"),
-        kvp("updatedAt", make_document(kvp("$lte", diffe)))
+        kvp("updatedAt", make_document(
+            kvp("$lte", cutoff)
+        ))
     );
 
-    auto update = make_document(kvp("$set", make_document(
-        kvp("status", "failed"),
-        kvp("internalError", "Worker crashed; please resubmit")
-    )));
+    auto update = make_document(
+        kvp("$set", make_document(
+            kvp("status", "failed"),
+            kvp("internalError", "Worker crashed; please resubmit")
+        ))
+    );
 
-    mongocxx::options::find options{};
-    options.projection(make_document(kvp("_id", 1)));
-    options.batch_size(5000);
+    auto result = collection.update_many(filter.view(), update.view());
 
-    auto cursor = collection.find(filter.view(), options);
-
-    mongocxx::options::bulk_write bulk_opts;
-    bulk_opts.ordered(false);
-
-    std::vector<mongocxx::model::write> batch_ops;
-    constexpr int batch_size = 5000;
-
-    for (auto&& doc : cursor) {
-        auto id = doc["_id"].get_value();
-        auto match = make_document(kvp("_id", id));
-
-        mongocxx::model::update_one update_op(match.view(), update.view());
-        batch_ops.push_back(update_op);
-
-        if (batch_ops.size() >= batch_size) {
-            auto bulk = collection.create_bulk_write(bulk_opts);
-            for (const auto& op : batch_ops) {
-                bulk.append(op);
-            }
-            bulk.execute();
-            batch_ops.clear();
-        }
-    }
-
-    if (!batch_ops.empty()) {
-        auto bulk = collection.create_bulk_write(bulk_opts);
-        for (const auto& op : batch_ops) {
-            bulk.append(op);
-        }
-        bulk.execute();
+    if (result && result->modified_count() > 0) {
+        std::cout << "Killed "
+                  << result->modified_count()
+                  << " dead jobs." << std::endl;
     }
 }

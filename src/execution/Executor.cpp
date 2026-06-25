@@ -29,11 +29,11 @@ void Executor::execute(const std::string& id, Job& job){
     int memoryLimit = job.memoryLimit == 0 ? 256 : job.memoryLimit;
     int timeInS = timeLimit / 1000;
 
-    if(timeInS > 5) {
+    if(timeInS > 8) {
         throw std::runtime_error("Critical Error: timeLimit is beyond the max limit");
     }
 
-    if(memoryLimit > 1024){
+    if(memoryLimit > 512){
         throw std::runtime_error("Critical Error: memoryLimit is beyond the max limit");
     }
 

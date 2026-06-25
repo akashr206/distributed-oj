@@ -33,12 +33,13 @@ function createApp(options = {}) {
     }
   }
 
-  app.get('/health', (_req, res) => {
+  app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', service: 'distributed-oj-worker-server' });
   });
 
-  app.post('/submit', async (req, res) => {
+  app.post('/api/submit', async (req, res) => {
     const job = req.body;
+    const allowedLanguages = ['cpp'];
 
     if (!job || typeof job !== 'object') {
       return res.status(400).json({ error: 'Request body must be an object.' });
@@ -51,24 +52,45 @@ function createApp(options = {}) {
       return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
     }
 
+    const timeLimitValue = Number(job.timeLimit ?? 2000);
+    const memoryLimitValue = Number(job.memoryLimit ?? 256);
+    const normalizedLanguage = job.language.trim().toLowerCase();
+
+    if (!Number.isInteger(timeLimitValue) || timeLimitValue < 100 || timeLimitValue > 8000) {
+      return res.status(400).json({ error: 'timeLimit must be an integer between 100 and 8000 ms.' });
+    }
+
+    if (!Number.isInteger(memoryLimitValue) || memoryLimitValue < 32 || memoryLimitValue > 512) {
+      return res.status(400).json({ error: 'memoryLimit must be an integer between 32 and 512 MB.' });
+    }
+
+    if (!allowedLanguages.includes(normalizedLanguage)) {
+      return res.status(400).json({ error: `language must be one of: ${allowedLanguages.join(', ')}` });
+    }
+
+    if (typeof job.expected !== 'string' || job.expected.trim() === '') {
+      return res.status(400).json({ error: 'expected output cannot be empty.' });
+    }
+
     try {
       await connectServices();
-
+      const curDate = Date.now();
       const submission = {
         code: job.code,
         input: job.input || '',
         expected: job.expected || '',
-        language: job.language,
-        timeLimit: Number(job.timeLimit ?? 1000),
-        memoryLimit: Number(job.memoryLimit ?? 256),
+        language: normalizedLanguage,
+        timeLimit: timeLimitValue,
+        memoryLimit: memoryLimitValue,
         status: 'pending',
         output: '',
         verdict: '',
-        timeTaken: 0,
-        memoryUsed: 0,
+        timeTaken: null,
+        memoryUsed: null,
         error: '',
         internalError: '',
-        createdAt: new Date(),
+        createdAt: curDate,
+        updatedAt: curDate
       };
 
       const result = await mongoDb.collection('jobs').insertOne(submission);
@@ -77,8 +99,8 @@ function createApp(options = {}) {
 
       return res.status(202).json({
         message: 'Submission accepted',
-        jobId,
-        submission: { ...submission, _id: jobId }
+        submissionId: jobId,
+        // submission: { ...submission, _id: jobId }
       });
     } catch (error) {
       console.error('[submit]', error);
@@ -86,10 +108,20 @@ function createApp(options = {}) {
     }
   });
 
-  app.get('/jobs/:id', async (req, res) => {
+  app.get('/api/submissions/:id', async (req, res) => {
     try {
       await connectServices();
-      const job = await mongoDb.collection('jobs').findOne({ _id: new ObjectId(req.params.id) });
+      const job = await mongoDb.collection('jobs').findOne(
+        { _id: new ObjectId(req.params.id) },
+        {
+          projection: {
+            code: 0,
+            updatedAt: 0,
+            createdAt: 0,
+            internalError: 0
+          }
+        }
+      );
 
       if (!job) {
         return res.status(404).json({ error: 'Job not found' });
