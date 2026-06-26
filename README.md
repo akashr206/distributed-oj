@@ -17,6 +17,30 @@ This project has three main parts:
 - build/ - CMake build output
 - docker/ - container-related files
 
+## Architecture
+
+This project is built around a distributed execution model in which the API server and the judging workers are separate components.
+
+![Architecture](docs/architecture.png)
+
+### How the distributed workers work
+
+1. A client sends a submission to the Express API.
+2. The API validates the payload and writes a job record to MongoDB.
+3. The API pushes the job ID into a Redis queue named by the QUEUE_NAME setting.
+4. One or more worker processes read from that queue and claim jobs for execution.
+5. Each worker loads the full job details from MongoDB, runs the submission inside a Docker sandbox, and records the result back to MongoDB.
+6. The worker can update the job state from pending to running, completed, or failed as execution progresses.
+
+### Main Components
+
+- API layer: Node.js/Express server in server/app.js
+- Queueing: Redis for job distribution between producers and workers
+- Persistence: MongoDB for storing job metadata, input/output, and verdicts
+- Execution engine: C++ worker in src/ that runs submissions in isolated Docker containers
+- Sandbox isolation: each submission is executed in a container with resource limits for CPU, memory, and process count
+
+
 ## Prerequisites
 
 Make sure these are installed:
